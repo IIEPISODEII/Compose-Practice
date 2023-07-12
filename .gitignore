@@ -22,9 +22,6 @@ output.json
 # IntelliJ
 *.iml
 .idea/
-misc.xml
-.idea/deploymentTargetDropDown.xml
-render.experimental.xml
 
 # Keystore files
 *.jks
@@ -198,6 +195,3 @@ fabric.properties
 !/gradle/wrapper/gradle-wrapper.jar
 
 # End of https://www.toptal.com/developers/gitignore/api/android,androidstudio,java,kotlin
-/.idea/
-.idea
-/gradle/
