@@ -60,10 +60,6 @@ fun BottomSheetDialog(
         )
     }
 
-    LaunchedEffect(key1 = behaviorProperties.sheetState, block = {
-        println("Behavior Properties >> ${behaviorProperties.sheetState}")
-    })
-
     BackHandler(enabled = currentSheetState == SheetState.FULLY_EXPANDED) {
         currentSheetState = SheetState.COLLAPSED
     }
