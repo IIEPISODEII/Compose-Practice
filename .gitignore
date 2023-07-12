@@ -22,6 +22,7 @@ output.json
 # IntelliJ
 *.iml
 .idea/
+build.gradle
 
 # Keystore files
 *.jks
