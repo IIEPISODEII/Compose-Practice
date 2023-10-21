@@ -1,4 +1,4 @@
-package com.sb.composepractice.ui.core
+package com.sb.composepractice.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
