@@ -26,7 +26,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 @Composable
 fun CircularMenu(
@@ -166,6 +168,8 @@ internal fun Menu(
                             it.x - pxSize / 2F
                         ) * 180 / Math.PI
                         if (tapPositionAngle < 0) tapPositionAngle += 360F
+                        val tapPositionRadius = hypot(it.x-pxSize/2F, it.y-pxSize/2F)
+                        if (tapPositionRadius > pxSize/2F) return@detectTapGestures
 
                         var angleDifference = tapPositionAngle - angle * sensitivity
                         while (angleDifference < 0) angleDifference += 360
