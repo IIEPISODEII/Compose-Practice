@@ -1,7 +1,7 @@
 package com.sb.composepractice.ui.core
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -9,8 +9,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,9 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 @Composable
 fun CircularMenu(
@@ -76,7 +76,7 @@ fun CircularMenu(
             Menu(
                 size = size,
                 itemList = list.map {it.toString() },
-                onMenuItemClick = { idx -> println("클릭 포지션: $idx")}
+                onMenuItemClick = { angle, idx -> println("각도: $angle, 아이템 번호: $idx")}
             )
         }
     )
@@ -87,7 +87,7 @@ internal fun Menu(
     size: Int,
     itemList: List<String>,
     animationDuration: Int = 2000,
-    onMenuItemClick: (Int) -> Unit = {}
+    onMenuItemClick: (Float, Int) -> Unit = { angle: Float, idx: Int -> }
 ) {
     require(itemList.isNotEmpty())
 
@@ -96,11 +96,21 @@ internal fun Menu(
     val sensitivity = 10
 
     var angle by remember { mutableFloatStateOf(0F) }
-    val animatedAngle by animateFloatAsState(
-        targetValue = angle*sensitivity,
-        label = "",
-        animationSpec = tween(durationMillis = animationDuration, delayMillis = 0, easing = LinearOutSlowInEasing)
-    )
+    var isTapped by remember { mutableStateOf(false) }
+    val animatedAngle = remember { Animatable(0F) }
+    LaunchedEffect(key1 = isTapped, key2 = angle) {
+        if (isTapped) {
+            animatedAngle.stop()
+        }
+        else animatedAngle.animateTo(
+            targetValue = angle * sensitivity,
+            animationSpec = tween(
+                durationMillis = animationDuration,
+                delayMillis = 0,
+                easing = LinearOutSlowInEasing
+            )
+        )
+    }
     val sweepAngle = remember { 360F / itemList.size }
     val colorList = List(itemList.size) {
         when {
@@ -134,7 +144,7 @@ internal fun Menu(
             .drawBehind {
                 repeat(itemList.size) {
                     drawArc(
-                        startAngle = animatedAngle + sweepAngle*it,
+                        startAngle = animatedAngle.value + sweepAngle * it,
                         sweepAngle = sweepAngle,
                         color = colorList[it],
                         useCenter = true
@@ -145,6 +155,7 @@ internal fun Menu(
                 detectDragGestures(
                     onDragStart = {},
                     onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                        isTapped = false
                         var oldAngle = atan2(
                             change.position.y - dragAmount.y - pxSize / 2F,
                             change.position.x - dragAmount.x - pxSize / 2F
@@ -163,19 +174,20 @@ internal fun Menu(
             .pointerInput(true) {
                 detectTapGestures(
                     onTap = {
+                        // 탭한 위치의 각도
                         var tapPositionAngle = atan2(
                             it.y - pxSize / 2F,
                             it.x - pxSize / 2F
                         ) * 180 / Math.PI
                         if (tapPositionAngle < 0) tapPositionAngle += 360F
-                        val tapPositionRadius = hypot(it.x-pxSize/2F, it.y-pxSize/2F)
-                        if (tapPositionRadius > pxSize/2F) return@detectTapGestures
 
-                        var angleDifference = tapPositionAngle - angle * sensitivity
-                        while (angleDifference < 0) angleDifference += 360
-                        val tapIndex = (angleDifference/sweepAngle).toInt()
-
-                        onMenuItemClick(tapIndex)
+                        isTapped = true
+                        val rotatedTapPositionAngle = (tapPositionAngle.toFloat() - animatedAngle.value%360).let { angle ->
+                            if (angle < 0F) angle + 360F
+                            else angle
+                        }
+                        val tapItemIdx = (rotatedTapPositionAngle * itemList.size / 360).toInt()
+                        onMenuItemClick(rotatedTapPositionAngle, tapItemIdx)
                     }
                 )
             },
