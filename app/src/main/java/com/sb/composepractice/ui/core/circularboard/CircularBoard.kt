@@ -1,4 +1,4 @@
-package com.sb.composepractice.ui.core
+package com.sb.composepractice.ui.core.circularboard
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -24,19 +24,19 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun CircularMenu(
+fun CircularBoard(
     size: Int = 400,
     startAngle: Int = 0,
     endAngle: Int = 360,
     modifier: Modifier,
     list: List<Int>,
+    onMenuItemClick: (Float, Int) -> Unit
 ) {
     require(startAngle < endAngle) { "EndAngle should be larger than StartAngle" }
 
@@ -76,7 +76,7 @@ fun CircularMenu(
             Menu(
                 size = size,
                 itemList = list.map {it.toString() },
-                onMenuItemClick = { angle, idx -> println("각도: $angle, 아이템 번호: $idx")}
+                onMenuItemClick = onMenuItemClick
             )
         }
     )
@@ -193,10 +193,4 @@ internal fun Menu(
             },
         contentAlignment = Alignment.Center
     ) {}
-}
-
-@Composable
-@Preview
-fun Preview() {
-    CircularMenu(modifier = Modifier, list = listOf(1, 2, 3))
 }
