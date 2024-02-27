@@ -3,11 +3,16 @@ package com.sb.composepractice.ui.core.circularboard
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,94 +20,57 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toOffset
+import kotlinx.coroutines.delay
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
 fun CircularBoard(
-    size: Int = 400,
+    radius: Int = 150,
     startAngle: Int = 0,
     endAngle: Int = 360,
-    modifier: Modifier,
-    list: List<Int>,
+    itemList: List<Int>,
+    animationDuration: Int = 2000,
     onMenuItemClick: (Float, Int) -> Unit
 ) {
     require(startAngle < endAngle) { "EndAngle should be larger than StartAngle" }
 
-    Layout(
-        modifier = modifier
-            .size(size.dp)
-            .background(color = Color.Black),
-        measurePolicy = { measurables, constraints ->
-            val placeables = measurables.map {
-                it.measure(
-                    constraints.copy(
-                        maxWidth = constraints.maxWidth,
-                        minWidth = constraints.maxWidth,
-                        maxHeight = constraints.maxHeight,
-                        minHeight = constraints.maxHeight
-                    )
-                )
-            }
-
-            val centerX = constraints.maxWidth / 2
-            val centerY = constraints.maxHeight / 2
-            val theta = (endAngle - startAngle) / 180 * 3.1415927F / list.size
-
-            layout(
-                width = constraints.maxWidth,
-                height = constraints.maxHeight,
-            ) {
-
-                placeables.forEachIndexed { index, placeable ->
-                    val x = centerX + sin(theta * index) * (constraints.maxWidth / 2F)
-                    val y = centerY - cos(theta * index) * (constraints.maxHeight / 2F)
-                    placeable.place(x = 0, y = 0)
-                }
-            }
-        },
-        content = {
-            Menu(
-                size = size,
-                itemList = list.map {it.toString() },
-                onMenuItemClick = onMenuItemClick
-            )
-        }
-    )
-}
-
-@Composable
-internal fun Menu(
-    size: Int,
-    itemList: List<String>,
-    animationDuration: Int = 2000,
-    onMenuItemClick: (Float, Int) -> Unit = { angle: Float, idx: Int -> }
-) {
     require(itemList.isNotEmpty())
 
+    println("현재 너비: ${LocalDensity.current.density * 2 * radius} vs ${LocalConfiguration.current.screenWidthDp * LocalDensity.current.density}")
+
     val density = LocalDensity.current.density
-    val pxSize = size * density
+    val radiusInPx = radius * density
     val sensitivity = 10
 
     var angle by remember { mutableFloatStateOf(0F) }
-    var isTapped by remember { mutableStateOf(false) }
+    var tapCounter by remember { mutableStateOf(false) }
+    var tappedPosition by remember { mutableStateOf(Offset(0F, 0F)) }
     val animatedAngle = remember { Animatable(0F) }
-    LaunchedEffect(key1 = isTapped, key2 = angle) {
-        if (isTapped) {
-            animatedAngle.stop()
-        }
-        else animatedAngle.animateTo(
+    val sweepAngle = remember { 360F / itemList.size }
+    val interactionSource= remember { MutableInteractionSource() }
+    LaunchedEffect(key1 = tapCounter) {
+        animatedAngle.stop()
+        val tapEvent = PressInteraction.Press(tappedPosition)
+        interactionSource.emit(tapEvent)
+        delay(33L)
+        interactionSource.emit(PressInteraction.Release(tapEvent))
+    }
+    LaunchedEffect(key1 = angle) {
+        animatedAngle.animateTo(
             targetValue = angle * sensitivity,
             animationSpec = tween(
                 durationMillis = animationDuration,
@@ -111,7 +79,6 @@ internal fun Menu(
             )
         )
     }
-    val sweepAngle = remember { 360F / itemList.size }
     val colorList = List(itemList.size) {
         when {
             it.toFloat() <= itemList.size/3F -> {
@@ -140,57 +107,81 @@ internal fun Menu(
 
     Box(
         modifier = Modifier
-            .size(size.dp)
-            .drawBehind {
-                repeat(itemList.size) {
-                    drawArc(
-                        startAngle = animatedAngle.value + sweepAngle * it,
-                        sweepAngle = sweepAngle,
-                        color = colorList[it],
-                        useCenter = true
+            .wrapContentSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .size((radius*2).dp)
+                .drawBehind {
+                    repeat(itemList.size) {
+                        drawArc(
+                            startAngle = animatedAngle.value + sweepAngle * it,
+                            sweepAngle = sweepAngle,
+                            color = colorList[it],
+                            useCenter = true
+                        )
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = {},
+                        onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                            var oldAngle = atan2(
+                                change.position.y - dragAmount.y - radiusInPx,
+                                change.position.x - dragAmount.x - radiusInPx
+                            ) * 180 / Math.PI
+                            var newAngle = atan2(
+                                change.position.y - radiusInPx,
+                                change.position.x - radiusInPx
+                            ) * 180 / Math.PI
+
+                            if (newAngle in -180F..-90F && oldAngle in 90F..180F) newAngle += 360
+                            if (oldAngle in -180F..-90F && newAngle in 90F..180F) oldAngle += 360
+                            angle += (newAngle - oldAngle).toFloat()
+                        }
                     )
                 }
-            }
-            .pointerInput(true) {
-                detectDragGestures(
-                    onDragStart = {},
-                    onDrag = { change: PointerInputChange, dragAmount: Offset ->
-                        isTapped = false
-                        var oldAngle = atan2(
-                            change.position.y - dragAmount.y - pxSize / 2F,
-                            change.position.x - dragAmount.x - pxSize / 2F
-                        ) * 180 / Math.PI
-                        var newAngle = atan2(
-                            change.position.y - pxSize / 2F,
-                            change.position.x - pxSize / 2F
-                        ) * 180 / Math.PI
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            // 탭한 위치의 각도
+                            var tapPositionAngle = atan2(
+                                it.y - radiusInPx,
+                                it.x - radiusInPx
+                            ) * 180 / Math.PI
+                            if (tapPositionAngle < 0) tapPositionAngle += 360F
+                            tappedPosition = Offset(x = it.x, it.y)
 
-                        if (newAngle in -180F..-90F && oldAngle in 90F..180F) newAngle += 360
-                        if (oldAngle in -180F..-90F && newAngle in 90F..180F) oldAngle += 360
-                        angle += (newAngle - oldAngle).toFloat()
-                    }
-                )
-            }
-            .pointerInput(true) {
-                detectTapGestures(
-                    onTap = {
-                        // 탭한 위치의 각도
-                        var tapPositionAngle = atan2(
-                            it.y - pxSize / 2F,
-                            it.x - pxSize / 2F
-                        ) * 180 / Math.PI
-                        if (tapPositionAngle < 0) tapPositionAngle += 360F
-
-                        isTapped = true
-                        val rotatedTapPositionAngle = (tapPositionAngle.toFloat() - animatedAngle.value%360).let { angle ->
-                            if (angle < 0F) angle + 360F
-                            else angle
+                            tapCounter = !tapCounter
+                            val rotatedTapPositionAngle =
+                                (tapPositionAngle.toFloat() - animatedAngle.value % 360).let { angle ->
+                                    if (angle < 0F) angle + 360F
+                                    else angle % 360
+                                }
+                            val tapItemIdx = (rotatedTapPositionAngle * itemList.size / 360).toInt()
+                            onMenuItemClick(rotatedTapPositionAngle, tapItemIdx)
                         }
-                        val tapItemIdx = (rotatedTapPositionAngle * itemList.size / 360).toInt()
-                        onMenuItemClick(rotatedTapPositionAngle, tapItemIdx)
-                    }
+                    )
+                }
+        )
+
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .offset {
+                    IntOffset(
+                        x = (tappedPosition.x - 16*density).roundToInt(),
+                        y = (tappedPosition.y - 16*density).roundToInt()
+                    )
+                }
+                .indication(
+                    interactionSource = interactionSource,
+                    indication = rememberRipple(
+                        bounded = false,
+                        radius = 16.dp,
+                        color = Color.White
+                    )
                 )
-            },
-        contentAlignment = Alignment.Center
-    ) {}
+        )
+    }
 }

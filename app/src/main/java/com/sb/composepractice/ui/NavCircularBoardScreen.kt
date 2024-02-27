@@ -28,8 +28,7 @@ fun NavCircularBoardScreen() {
             .fillMaxSize()
     ) {
         CircularBoard(
-            modifier = Modifier,
-            list = List(9) { it },
+            itemList = List(9) { it },
             onMenuItemClick = { angle, idx ->
                 circularMenuTapAngle = angle
                 circularMenuTapItemIdx = idx
